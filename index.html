@@ -7,9 +7,22 @@
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
+    #spawnButton {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <button id="spawnButton">Spawn Cube</button>
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
   <script src="https://threejs.org/build/three.min.js"></script>

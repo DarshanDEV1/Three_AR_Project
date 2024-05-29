@@ -60,20 +60,32 @@ window.onload = () => {
     // Create an array to hold the cubes
     const cubes = [];
   
-    // Add event listener for click
-    window.addEventListener('click', (event) => {
-      const cube = createCube();
-      cube.position.set(Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1);
-      markerRoot.add(cube);
-      cubes.push(cube);
-    });
+    // Raycaster setup
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
   
     // Function to create a cube
-    const createCube = () => {
+    const createCube = (position) => {
       const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
       const material = new THREE.MeshNormalMaterial();
-      return new THREE.Mesh(geometry, material);
+      const cube = new THREE.Mesh(geometry, material);
+      cube.position.copy(position);
+      return cube;
     };
+  
+    // Add event listener for the button click
+    document.getElementById('spawnButton').addEventListener('click', () => {
+      // Set the raycaster from the camera through the center of the screen
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(markerRoot, true);
+      
+      if (intersects.length > 0) {
+        const intersect = intersects[0];
+        const cube = createCube(intersect.point);
+        markerRoot.add(cube);
+        cubes.push(cube);
+      }
+    });
   
     // Animation loop
     const animate = () => {
@@ -94,3 +106,4 @@ window.onload = () => {
   
     animate();
   };
+  
