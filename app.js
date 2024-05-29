@@ -1,5 +1,3 @@
-import THREE from "https://unpkg.com/three@0.127.0/build/three.module.js"
-
 let xrSession = null;
 let hitTestSource = null;
 let localReferenceSpace = null;
