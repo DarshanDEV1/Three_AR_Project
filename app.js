@@ -1,97 +1,79 @@
-window.onload = () => {
-    // Initialize the scene, camera, and renderer
-    const scene = new THREE.Scene();
-    const camera = new THREE.Camera();
-    scene.add(camera);
-  
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true
+if (navigator.xr) {
+    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+      if (supported) {
+        initializeAR();
+      } else {
+        alert('AR not supported on this device');
+      }
     });
+  } else {
+    alert('WebXR not supported on this browser');
+  }
+  
+  function initializeAR() {
+    // Initialize scene, camera, and renderer
+    const scene = new THREE.Scene();
+  
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.domElement.style.position = 'absolute';
-    renderer.domElement.style.top = '0px';
-    renderer.domElement.style.left = '0px';
+    renderer.xr.enabled = true;
     document.body.appendChild(renderer.domElement);
   
-    // Initialize AR.js
-    const arToolkitSource = new THREEx.ArToolkitSource({
-      sourceType: 'webcam'
-    });
+    // Add a light to the scene
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    scene.add(light);
   
-    arToolkitSource.init(() => {
-      setTimeout(() => {
-        onResize();
-      }, 2000);
-    });
+    // Initialize WebXR
+    const xrSessionInit = { requiredFeatures: ['hit-test', 'dom-overlay'], domOverlay: { root: document.body } };
   
-    // Handle resizing
-    window.addEventListener('resize', () => {
-      onResize();
-    });
-  
-    const onResize = () => {
-      arToolkitSource.onResizeElement();
-      arToolkitSource.copyElementSizeTo(renderer.domElement);
-      if (arToolkitContext.arController !== null) {
-        arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
-      }
-    };
-  
-    // Create AR toolkit context
-    const arToolkitContext = new THREEx.ArToolkitContext({
-      cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/data/camera_para.dat',
-      detectionMode: 'mono'
-    });
-  
-    arToolkitContext.init(() => {
-      camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
-    });
-  
-    // Create a marker
-    const markerRoot = new THREE.Group();
-    scene.add(markerRoot);
-  
-    const arMarkerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-      type: 'pattern',
-      patternUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/data/patt.hiro',
-    });
-  
-    // Create an array to hold the cubes
+    // Handle click events to add cubes
     const cubes = [];
-  
-    // Add event listener for click
-    window.addEventListener('click', (event) => {
-      const cube = createCube();
-      cube.position.set(Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1);
-      markerRoot.add(cube);
-      cubes.push(cube);
+    renderer.domElement.addEventListener('click', (event) => {
+      const x = (event.clientX / window.innerWidth) * 2 - 1;
+      const y = -(event.clientY / window.innerHeight) * 2 + 1;
+      const hitTestSourceRequested = xrSession.requestReferenceSpace('viewer').then((refSpace) => {
+        xrSession.requestHitTestSource({ space: refSpace }).then((hitTestSource) => {
+          const frame = xrSession.requestAnimationFrame((timestamp, xrFrame) => {
+            const viewerPose = xrFrame.getViewerPose(refSpace);
+            if (viewerPose) {
+              const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
+              if (hitTestResults.length > 0) {
+                const hit = hitTestResults[0];
+                const pose = hit.getPose(refSpace);
+                const cube = createCube();
+                cube.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+                scene.add(cube);
+                cubes.push(cube);
+              }
+            }
+          });
+        });
+      });
     });
   
-    // Function to create a cube
+    // Create a cube
     const createCube = () => {
-      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-      const material = new THREE.MeshNormalMaterial();
+      const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+      const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
       return new THREE.Mesh(geometry, material);
     };
   
     // Animation loop
     const animate = () => {
-      requestAnimationFrame(animate);
-  
-      if (arToolkitSource.ready) {
-        arToolkitContext.update(arToolkitSource.domElement);
-      }
-  
-      // Rotate each cube
-      cubes.forEach(cube => {
-        cube.rotation.x += 0.01;
-        cube.rotation.y += 0.01;
+      renderer.setAnimationLoop((timestamp, frame) => {
+        if (frame) {
+          const session = renderer.xr.getSession();
+          const refSpace = renderer.xr.getReferenceSpace();
+          session.requestAnimationFrame(animate);
+          renderer.render(scene, camera);
+        }
       });
-  
-      renderer.render(scene, camera);
     };
   
-    animate();
-  };
+    navigator.xr.requestSession('immersive-ar', xrSessionInit).then((session) => {
+      renderer.xr.setSession(session);
+      animate();
+    });
+  }
   
