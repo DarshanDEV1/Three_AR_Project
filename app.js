@@ -1,79 +1,103 @@
-if (navigator.xr) {
-    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-      if (supported) {
-        initializeAR();
-      } else {
-        alert('AR not supported on this device');
+let xrSession = null;
+let hitTestSource = null;
+let localReferenceSpace = null;
+let viewerReferenceSpace = null;
+let hitTestSourceInitialized = false;
+const cubes = [];
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// Add a light to the scene
+const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+scene.add(light);
+
+// Create a cube
+const createCube = () => {
+  const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+  const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
+  return new THREE.Mesh(geometry, material);
+};
+
+const initializeHitTestSource = async () => {
+  if (hitTestSourceInitialized) return;
+  hitTestSourceInitialized = true;
+
+  viewerReferenceSpace = await xrSession.requestReferenceSpace('viewer');
+  hitTestSource = await xrSession.requestHitTestSource({ space: viewerReferenceSpace });
+};
+
+const onSelect = (event) => {
+  if (!hitTestSource) return;
+
+  const frame = event.frame;
+  const hitTestResults = frame.getHitTestResults(hitTestSource);
+  if (hitTestResults.length > 0) {
+    const referenceSpace = renderer.xr.getReferenceSpace();
+    const hit = hitTestResults[0];
+    const pose = hit.getPose(referenceSpace);
+
+    const cube = createCube();
+    cube.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+    scene.add(cube);
+    cubes.push(cube);
+  }
+};
+
+const animate = () => {
+  renderer.setAnimationLoop((timestamp, frame) => {
+    if (frame) {
+      if (!hitTestSource) {
+        initializeHitTestSource();
       }
-    });
-  } else {
-    alert('WebXR not supported on this browser');
-  }
-  
-  function initializeAR() {
-    // Initialize scene, camera, and renderer
-    const scene = new THREE.Scene();
-  
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
-  
-    // Add a light to the scene
-    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-    scene.add(light);
-  
-    // Initialize WebXR
-    const xrSessionInit = { requiredFeatures: ['hit-test', 'dom-overlay'], domOverlay: { root: document.body } };
-  
-    // Handle click events to add cubes
-    const cubes = [];
-    renderer.domElement.addEventListener('click', (event) => {
-      const x = (event.clientX / window.innerWidth) * 2 - 1;
-      const y = -(event.clientY / window.innerHeight) * 2 + 1;
-      const hitTestSourceRequested = xrSession.requestReferenceSpace('viewer').then((refSpace) => {
-        xrSession.requestHitTestSource({ space: refSpace }).then((hitTestSource) => {
-          const frame = xrSession.requestAnimationFrame((timestamp, xrFrame) => {
-            const viewerPose = xrFrame.getViewerPose(refSpace);
-            if (viewerPose) {
-              const hitTestResults = xrFrame.getHitTestResults(hitTestSource);
-              if (hitTestResults.length > 0) {
-                const hit = hitTestResults[0];
-                const pose = hit.getPose(refSpace);
-                const cube = createCube();
-                cube.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-                scene.add(cube);
-                cubes.push(cube);
-              }
-            }
-          });
-        });
-      });
-    });
-  
-    // Create a cube
-    const createCube = () => {
-      const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-      const material = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
-      return new THREE.Mesh(geometry, material);
-    };
-  
-    // Animation loop
-    const animate = () => {
-      renderer.setAnimationLoop((timestamp, frame) => {
-        if (frame) {
-          const session = renderer.xr.getSession();
-          const refSpace = renderer.xr.getReferenceSpace();
-          session.requestAnimationFrame(animate);
-          renderer.render(scene, camera);
+
+      if (hitTestSource) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
+          if (pose) {
+            // Optional: visual indicator of hit test results
+          }
         }
+      }
+
+      cubes.forEach(cube => {
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
       });
-    };
-  
-    navigator.xr.requestSession('immersive-ar', xrSessionInit).then((session) => {
-      renderer.xr.setSession(session);
-      animate();
+
+      renderer.render(scene, camera);
+    }
+  });
+};
+
+if (navigator.xr) {
+  navigator.xr.requestSession('immersive-ar', {
+    requiredFeatures: ['hit-test']
+  }).then((session) => {
+    xrSession = session;
+    renderer.xr.setSession(session);
+
+    session.addEventListener('select', onSelect);
+    session.requestReferenceSpace('local').then((refSpace) => {
+      localReferenceSpace = refSpace;
+      renderer.xr.setReferenceSpace(refSpace);
     });
-  }
-  
+
+    animate();
+  });
+} else {
+  alert('WebXR not supported on this browser');
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
