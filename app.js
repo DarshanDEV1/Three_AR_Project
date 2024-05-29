@@ -1,6 +1,3 @@
-import THREE from "https://unpkg.com/three@0.127.0/build/three.module.js"
-
-// Wait for the page to load
 window.onload = () => {
     // Initialize the scene, camera, and renderer
     const scene = new THREE.Scene();
@@ -60,12 +57,23 @@ window.onload = () => {
       patternUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/data/patt.hiro',
     });
   
-    // Add a cube to the marker
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshNormalMaterial();
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.y = 0.5;
-    markerRoot.add(cube);
+    // Create an array to hold the cubes
+    const cubes = [];
+  
+    // Add event listener for click
+    window.addEventListener('click', (event) => {
+      const cube = createCube();
+      cube.position.set(Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1);
+      markerRoot.add(cube);
+      cubes.push(cube);
+    });
+  
+    // Function to create a cube
+    const createCube = () => {
+      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      const material = new THREE.MeshNormalMaterial();
+      return new THREE.Mesh(geometry, material);
+    };
   
     // Animation loop
     const animate = () => {
@@ -75,9 +83,11 @@ window.onload = () => {
         arToolkitContext.update(arToolkitSource.domElement);
       }
   
-      // Rotate the cube
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
+      // Rotate each cube
+      cubes.forEach(cube => {
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+      });
   
       renderer.render(scene, camera);
     };
